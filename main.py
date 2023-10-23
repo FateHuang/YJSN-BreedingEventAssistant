@@ -78,76 +78,88 @@ def get_event_type(cur_event_type):
         return event_type["role_event"]
     return ""
 
+def is_event_change(cur_event_type, last_event_type, cur_event_name, last_event_name):
+    if cur_event_type != last_event_type:
+        return True
+    if cur_event_name != last_event_name:
+        return True
+    return False
+
 cur_event_type = ""
 cur_event_name = ""
 last_event_name = ""
+last_event_type = ""
 try:
     while True:
+        # 等待指定的时间间隔
+        last_event_name = cur_event_name
+        last_event_type = cur_event_type
+        time.sleep(interval)
         event_type_name = get_region_text(event_type_region)
         cur_event_type = get_event_type(event_type_name)
+        cur_event_name = get_region_text(event_name_region)
+        if not is_event_change(cur_event_type, last_event_type, cur_event_name, last_event_name):
+            continue
+        os.system('cls')
         if cur_event_type == "":
             print(f"未找到匹配的事件类型: {event_type_name}")
-        cur_event_name = get_region_text(event_name_region)
-        if last_event_name == "" or cur_event_name != last_event_name:
-            os.system('cls')
-            # 获取屏幕截图
+            continue
+        if cur_event_name == "":
             print(f"当前事件类型为：[{cur_event_type}]")
-            print(f"当前事件名为：[{cur_event_name}]")
-            options = None
-            if cur_event_type == "协助卡事件":
-                # 遍历所有role_events进行匹配
+            print(f"未检测到事件名: {cur_event_name}")
+            continue
+        print(f"当前事件类型为：[{cur_event_type}]")
+        print(f"当前事件名为：[{cur_event_name}]")
+        options = None
+        if cur_event_type == "协助卡事件":
+            # 遍历所有role_events进行匹配
+            max_similarity = 0
+            match_event_name = ""
+            for role_name, role_cfg in card_config.items():
+                if cur_event_name in role_cfg["role_events"]:
+                    options = role_cfg["role_events"][cur_event_name]
+                    break
+                # 进行模糊匹配
+                for event_name in role_cfg["role_events"]:
+                    # 计算两个字符串的相似度
+                    similarity = fuzz.ratio(cur_event_name, event_name)
+                    # print(f"[{role_name}] 匹配到的事件名：[{event_name}]，相似度为：{similarity}")
+                    if similarity > max_similarity:
+                        max_similarity = similarity
+                        match_event_name = event_name
+                if max_similarity > 50:
+                    print(f"匹配的事件名为：[{match_event_name}]，相似度为：{max_similarity}")
+                    options = role_cfg["role_events"][match_event_name]
+                    break
+            if options == None:
+                print("未匹配到事件")
+                continue
+        else:
+            if cur_event_name not in cur_role_cfg["role_events"]:
+                # 进行模糊匹配
                 max_similarity = 0
                 match_event_name = ""
-                for role_name, role_cfg in card_config.items():
-                    if cur_event_name in role_cfg["role_events"]:
-                        options = role_cfg["role_events"][cur_event_name]
-                        break
-                    # 进行模糊匹配
-                    for event_name in role_cfg["role_events"]:
-                        # 计算两个字符串的相似度
-                        similarity = fuzz.ratio(cur_event_name, event_name)
-                        # print(f"[{role_name}] 匹配到的事件名：[{event_name}]，相似度为：{similarity}")
-                        if similarity > max_similarity:
-                            max_similarity = similarity
-                            match_event_name = event_name
-                    if max_similarity > 50:
-                        print(f"匹配的事件名为：[{match_event_name}]，相似度为：{max_similarity}")
-                        options = role_cfg["role_events"][match_event_name]
-                        break
-                if options == None:
-                    print("未匹配到事件")
+                # 遍历role_cfg["role_events"]中的所有事件名
+                for event_name in cur_role_cfg["role_events"]:
+                    # 计算两个字符串的相似度
+                    similarity = fuzz.ratio(cur_event_name, event_name)
+                    if similarity > max_similarity:
+                        max_similarity = similarity
+                        match_event_name = event_name
+                if max_similarity < 50:
+                    print(f"事件名[{cur_event_name}]不在配置文件中")
                     # 等待指定的时间间隔
                     time.sleep(interval)
                     continue
+                print(f"匹配的事件名为：[{match_event_name}]，相似度为：{max_similarity}")
+                options = cur_role_cfg["role_events"][match_event_name]
             else:
-                if cur_event_name not in cur_role_cfg["role_events"]:
-                    # 进行模糊匹配
-                    max_similarity = 0
-                    match_event_name = ""
-                    # 遍历role_cfg["role_events"]中的所有事件名
-                    for event_name in cur_role_cfg["role_events"]:
-                        # 计算两个字符串的相似度
-                        similarity = fuzz.ratio(cur_event_name, event_name)
-                        if similarity > max_similarity:
-                            max_similarity = similarity
-                            match_event_name = event_name
-                    if max_similarity < 50:
-                        print(f"事件名[{cur_event_name}]不在配置文件中")
-                        # 等待指定的时间间隔
-                        time.sleep(interval)
-                        continue
-                    print(f"匹配的事件名为：[{match_event_name}]，相似度为：{max_similarity}")
-                    options = cur_role_cfg["role_events"][match_event_name]
-                else:
-                    options = cur_role_cfg["role_events"][cur_event_name]
-            # 遍历options
-            for option in options:
-                # \n 替换成 \t\n
-                option = option.replace("\n", "\n\t")
-                print(option)
-            last_event_name = cur_event_name
-        # 等待指定的时间间隔
-        time.sleep(interval)
+                options = cur_role_cfg["role_events"][cur_event_name]
+        # 遍历options
+        for option in options:
+            # \n 替换成 \t\n
+            option = option.replace("\n", "\n\t")
+            print(option)
 
 except KeyboardInterrupt:
     print("结束")
