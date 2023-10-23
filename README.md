@@ -1,2 +1,2 @@
-# YJSN-BreedingEventAssistant
-赛马娘育成事件助手
+# 赛马娘(国服)育成事件助手
++ 把整个output文件夹下载下来就可以用了
