@@ -1,0 +1,6 @@
+numpy
+cnocr[ort-cpu]
+pyautogui
+pynput
+fuzzywuzzy
+pywin32
