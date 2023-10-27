@@ -1,3 +1,6 @@
+print("工具打开的时候会有点慢，耐心等待一会儿")
+print("开头会显示一些警告信息，无视即可。")
+import cv2
 import numpy as np
 from cnocr import CnOcr, read_img, line_split
 import pyautogui
@@ -14,15 +17,63 @@ ocr = CnOcr(rec_vocab_fp='.\label_cn.txt', rec_root='.\cnocr', det_root='.\cnstd
 # 定时截图的间隔（以秒为单位）
 interval = 1  # 1秒
 handle = windll.user32.FindWindowW(None, sys_cfg["模拟器窗口名"])
-base.resize_client(handle, 540, 960)
-# base.move_window(handle, 0, 0)
+# base.resize_client(handle, 540, 960)
 
-event_type_region = (90, 185, 251, 206)
-event_name_region = (90, 206, 411, 241)
+def on_click(x, y, button, pressed):
+    if pressed:
+        print(f'鼠标点击在 ({x}, {y})，按下的按钮是 {button}')
+        # 如果需要在此处执行其他操作，请添加您的代码
+    else:
+        # 单击已释放
+        return False  # 停止监听
 
-def get_region_text(region):
+def get_region(region_name):
+    # 提示用户点击左上角
+    print(f"请设置{region_name}区域的左上角")
+    # 创建鼠标监听器
+    mouse_listener1 = mouse.Listener(on_click=on_click)
+    mouse_listener1.start()
+    mouse_listener1.join()
+    left_top = pyautogui.position()  # 获取左上角坐标
+
+    # 提示用户点击右下角
+    print(f"请设置{region_name}区域的右下角")
+    # 创建鼠标监听器
+    mouse_listener2 = mouse.Listener(on_click=on_click)
+    mouse_listener2.start()
+    mouse_listener2.join()
+    right_bottom = pyautogui.position()  # 获取右下角坐标
+
+    return (left_top[0], left_top[1], right_bottom[0], right_bottom[1])
+
+if sys_cfg["校准模式"] == 1:
+    base.move_window(handle, 0, 0)
+    region1 = get_region("事件类型")
+    print("region1", region1)
+    sys_cfg["事件类型区域"] = list(region1)
+    region2 = get_region("事件名")
+    sys_cfg["事件名区域"] = list(region2)
+    print("region2", region2)
+    # 获取屏幕截图
+    image = base.window_shot(handle, region=region1)
+    image_bgr = cv2.cvtColor(image, cv2.COLOR_RGBA2BGR)
+    cv2.imwrite("event_type.png", image_bgr)
+    image2 = base.window_shot(handle, region=region2)
+    image_bgr2 = cv2.cvtColor(image2, cv2.COLOR_RGBA2BGR)
+    cv2.imwrite("event_name.png", image_bgr2)
+    # 将数据保存到JSON文件
+    with open("config.json", "w", encoding="utf-8") as json_file:
+        json.dump(sys_cfg, json_file, ensure_ascii=False, indent=4)
+    exit(0)
+
+event_type_region = tuple(sys_cfg["事件类型区域"])
+event_name_region = tuple(sys_cfg["事件名区域"])
+
+def get_region_text(region, name):
     # 获取屏幕截图
     image = base.window_shot(handle, region=region)
+    image_bgr = cv2.cvtColor(image, cv2.COLOR_RGBA2BGR)
+    cv2.imwrite(name+".png", image_bgr)
     # 识别截图中的文字
     out = ocr.ocr(image)
     # 合并所有text
@@ -41,6 +92,21 @@ with open("./data/data1.json", "r", encoding="utf-8") as f:
     role_config = json.load(f)
 with open("./data/card_data.json", "r", encoding="utf-8") as f:
     card_config = json.load(f)
+
+os.system('cls')
+print("""
+## 注意
++ 使用前需要修改output/config.json中的“模拟器窗口名”字段，改为需要监听的模拟器窗口名
+  + win+tab 选择程序窗口的时候，左上角就是各自窗口的名字
++ 为了达到最好的效果，请把模拟器分辨率设置成竖屏 720*1280分辨率
++ 设置好分辨率后，就不要再手动拉伸窗口的大小了，会导致识别错误。
++ 不要最小化模拟器窗口，会导致识别出错。（不要最小化就行，被遮挡或者模拟器窗口不在最上层是没有影响的）
+
+## 如遇到识别问题
++ 打开config.json文件，修改“校准模式”字段为1
++ 再次打开软件就会进入 “校准模式”，根据提示选择对应的识别区域
++ 然后把“校准模式”字段改回0，再次打开工具
+""")
 
 # 等待玩家输入
 role_name = input("请输入角色名：")
@@ -95,9 +161,9 @@ try:
         last_event_name = cur_event_name
         last_event_type = cur_event_type
         time.sleep(interval)
-        event_type_name = get_region_text(event_type_region)
+        event_type_name = get_region_text(event_type_region, "event_type")
         cur_event_type = get_event_type(event_type_name)
-        cur_event_name = get_region_text(event_name_region)
+        cur_event_name = get_region_text(event_name_region, "event_name")
         if not is_event_change(cur_event_type, last_event_type, cur_event_name, last_event_name):
             continue
         os.system('cls')
@@ -160,6 +226,5 @@ try:
             # \n 替换成 \t\n
             option = option.replace("\n", "\n\t")
             print(option)
-
 except KeyboardInterrupt:
     print("结束")

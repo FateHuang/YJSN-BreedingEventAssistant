@@ -140,7 +140,7 @@ def capture(handle: HWND):
     # 返回截图数据为numpy.ndarray
     return np.frombuffer(buffer, dtype=np.uint8).reshape(height, width, 4)
 
-def window_shot(handle, region):
+def window_shot(handle, region=None):
     image = capture(handle)
     if region:
         left, top, right, bottom = region
